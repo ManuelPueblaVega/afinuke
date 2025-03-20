@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Afinador de Ukelele</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@tailwindcss/browser@latest"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .fretboard {
+            background-color: #f5f5f5;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            max-width: 90%; /* Limita el ancho del diapasón en pantallas grandes */
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .fret {
+            height: 0.25rem;
+            background-color: #4a5568;
+            margin: 0.75rem 0;
+            position: relative;
+        }
+        .string {
+            height: 0.125rem;
+            background-color: #a0aec0;
+            margin: 0.25rem 0;
+            position: relative;
+        }
+        .note {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #f00;
+            color: #fff;
+            border-radius: 1rem;
+            width: 1.5rem;
+            height: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: bold;
+            visibility: hidden;
+        }
+        .string-label {
+            position: absolute;
+            top: 50%;
+            left: -2rem;
+            transform: translateY(-50%);
+            color: #718096;
+            font-size: 0.875rem;
+        }
+        .feedback {
+            margin-top: 1rem;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #4a5568;
+            text-align: center;
+            min-height: 3rem; /* Asegura que el feedback tenga suficiente espacio */
+            display: flex;
+            align-items: center; /* Centra verticalmente el texto */
+            justify-content: center;
+        }
+        .button-tune {
+            background-color: #4CAF50; /* Verde más moderno */
+            border: none;
+            color: white;
+            padding: 0.75rem 1.5rem; /* Padding un poco más pequeño */
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 1rem; /* Tamaño de fuente un poco más pequeño */
+            margin: 0.5rem 0.25rem; /* Margen un poco más pequeño */
+            cursor: pointer;
+            border-radius: 0.5rem; /* Bordes redondeados */
+            transition: background-color 0.3s ease; /* Transición suave */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2); /* Sombra suave */
+            width: 8rem; /* Ancho fijo para los botones */
+            display: flex; /* Para centrar el texto y el icono */
+            align-items: center;
+            justify-content: center;
+        }
+
+        .button-tune:hover {
+            background-color: #45a049; /* Verde más oscuro al pasar el ratón */
+        }
+
+        .button-tune:active {
+            background-color: #388e3c; /* Verde aún más oscuro al hacer clic */
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2); /* Sombra más pequeña al hacer clic */
+            transform: translateY(1px); /* Pequeño desplazamiento hacia arriba al hacer clic */
+        }
+
+        .button-icon {
+            margin-right: 0.5rem; /* Espacio entre el icono y el texto */
+            height: 1rem; /* Tamaño del icono */
+            width: 1rem;
+        }
+
+        #created-by {
+            margin-top: 2rem;
+            font-size: 0.875rem;
+            color: #718096;
+            text-align: center;
+        }
+    </style>
+    <script>
+        // Función para generar el tono de una nota
+        function generateTone(frequency, duration = 0.5) {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+            gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.8, audioContext.currentTime + 0.01);
+            gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + duration);
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            oscillator.start(audioContext.currentTime);
+
+            setTimeout(() => {
+                oscillator.stop();
+                audioContext.close();
+            }, duration * 1000);
+        }
+
+        // Frecuencias de las notas del ukelele
+        const ukuleleNotes = {
+            'G4': 392.00,
+            'C4': 261.63,
+            'E4': 329.63,
+            'A4': 440.00
+        };
+
+        // Asignación de notas a trastes
+        const fretboardNotes = {
+            0: { 'G4': 'G4', 'C4': 'C4', 'E4': 'E4', 'A4': 'A4' },
+            1: { 'G4': 'G#4', 'C4': 'C#4', 'E4': 'F4', 'A4': 'A#4' },
+            2: { 'G4': 'A4', 'C4': 'D4', 'E4': 'F#4', 'A4': 'B4' },
+            3: { 'G4': 'A#4', 'C4': 'D#4', 'E4': 'G4', 'A4': 'C5' },
+            4: { 'G4': 'B4', 'C4': 'E4', 'E4': 'G#4', 'A4': 'C#5' },
+            5: { 'G4': 'C5', 'C4': 'F4', 'E4': 'A4', 'A4': 'D5' },
+            6: { 'G4': 'C#5', 'C4': 'F#4', 'E4': 'A#4', 'A4': 'D#5' },
+            7: { 'G4': 'D5', 'C4': 'G4', 'E4': 'B4', 'A4': 'E5' },
+            8: { 'G4': 'D#5', 'C4': 'G#4', 'E4': 'C5', 'A4': 'F5' },
+            9: { 'G4': 'E5', 'C4': 'A4', 'E4': 'C#5', 'A4': 'F#5' },
+            10: { 'G4': 'F5', 'C4': 'A#4', 'E4': 'D5', 'A4': 'G5' },
+            11: { 'G4': 'F#5', 'C4': 'B4', 'E4': 'D#5', 'A4': 'G#5' },
+            12: { 'G4': 'G5', 'C4': 'C5', 'E4': 'E5', 'A4': 'A5' }
+        };
+
+        let audioContext;
+        let analyser;
+        let microphoneStream;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const fretboardDiv = document.getElementById('fretboard');
+
+            // Crear trastes y cuerdas
+            for (let i = 0; i <= 12; i++) {
+                const fretDiv = document.createElement('div');
+                fretDiv.classList.add('fret');
+                fretDiv.dataset.fret = i;
+                fretboardDiv.appendChild(fretDiv);
+
+                if (i > 0) {
+                    for (let j = 0; j < 4; j++) {
+                        const stringDiv = document.createElement('div');
+                        stringDiv.classList.add('string');
+                        stringDiv.dataset.string = j;
+                        fretDiv.appendChild(stringDiv);
+
+                        if (i === 0) {
+                            const stringLabel = document.createElement('div');
+                            stringLabel.classList.add('string-label');
+                            if (j === 0) stringLabel.textContent = 'G';
+                            else if (j === 1) stringLabel.textContent = 'C';
+                            else if (j === 2) stringLabel.textContent = 'E';
+                            else if (j === 3) stringLabel.textContent = 'A';
+                            stringDiv.appendChild(stringLabel);
+                        }
+
+                        const noteDiv = document.createElement('div');
+                        noteDiv.classList.add('note');
+                        stringDiv.appendChild(noteDiv);
+                    }
+                }
+            }
+
+            // Añadir eventos onclick a los botones de afinación
+            document.getElementById('tune-g').addEventListener('click', () => {
+                generateTone(ukuleleNotes['G4']);
+                showFretboardNote('G4');
+                startListening('G4');
+            });
+            document.getElementById('tune-c').addEventListener('click', () => {
+                generateTone(ukuleleNotes['C4']);
+                showFretboardNote('C4');
+                startListening('C4');
+            });
+            document.getElementById('tune-e').addEventListener('click', () => {
+                generateTone(ukuleleNotes['E4']);
+                showFretboardNote('E4');
+                startListening('E4');
+            });
+            document.getElementById('tune-a').addEventListener('click', () => {
+                generateTone(ukuleleNotes['A4']);
+                showFretboardNote('A4');
+                startListening('A4');
+            });
+        });
+
+        function showFretboardNote(note) {
+            const noteDivs = document.querySelectorAll('.note');
+            noteDivs.forEach(div => {
+                div.style.visibility = 'hidden';
+            });
+
+            for (let fret = 0; fret <= 12; fret++) {
+                for (let string = 0; string < 4; string++) {
+                    const stringLabel = ['G4', 'C4', 'E4', 'A4'][string];
+                    if (fretboardNotes[fret][stringLabel] === note) {
+                        const stringDiv = document.querySelector(`.fret:nth-child(${fret + 1}) .string:nth-child(${string + 1})`);
+                        const noteDiv = stringDiv.querySelector('.note');
+                        noteDiv.textContent = note.slice(0, -1);
+                        noteDiv.style.visibility = 'visible';
+                        break;
+                    }
+                }
+            }
+        }
+
+        function startListening(targetNote) {
+            const feedbackDiv = document.querySelector('.feedback');
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 2048;
+            }
+
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    if (microphoneStream) {
+                        microphoneStream.getTracks().forEach(track => track.stop());
+                    }
+                    microphoneStream = stream;
+                    const source = audioContext.createMediaStreamSource(stream);
+                    source.connect(analyser);
+
+                    const bufferLength = analyser.frequencyBinCount;
+                    const dataArray = new Uint8Array(bufferLength);
+
+                    function analyzePitch() {
+                        if (!microphoneStream) return;
+
+                        analyser.getByteFrequencyData(dataArray);
+                        let maxVolumeIndex = 0;
+                        let maxVolume = 0;
+                        for (let i = 0; i < bufferLength; i++) {
+                            if (dataArray[i] > maxVolume) {
+                                maxVolume = dataArray[i];
+                                maxVolumeIndex = i;
+                            }
+                        }
+
+                        const sampleRate = audioContext.sampleRate;
+                        const fundamentalFrequency = maxVolumeIndex * sampleRate / bufferLength;
+
+                        let noteName = '';
+                        let expectedFrequency = 0;
+                         switch (targetNote) {
+                            case 'G4':
+                                noteName = 'G4';
+                                expectedFrequency = ukuleleNotes['G4'];
+                                break;
+                            case 'C4':
+                                noteName = 'C4';
+                                expectedFrequency = ukuleleNotes['C4'];
+                                break;
+                            case 'E4':
+                                noteName = 'E4';
+                                expectedFrequency = ukuleleNotes['E4'];
+                                break;
+                            case 'A4':
+                                noteName = 'A4';
+                                expectedFrequency = ukuleleNotes['A4'];
+                                break;
+                        }
+
+                        const cents = 1200 * Math.log2(fundamentalFrequency / expectedFrequency);
+
+                        if (Math.abs(cents) < 5) {
+                            feedbackDiv.textContent = `¡Afinado! (${noteName})`;
+                            feedbackDiv.style.color = '#48bb78';
+                        } else if (cents > 0) {
+                            feedbackDiv.textContent = 'Demasiado agudo';
+                            feedbackDiv.style.color = '#f56565';
+                        } else {
+                            feedbackDiv.textContent = 'Demasiado grave';
+                            feedbackDiv.style.color = '#f56565';
+                        }
+
+                        requestAnimationFrame(analyzePitch);
+                    }
+
+                    analyzePitch();
+                })
+                .catch(err => {
+                    console.error('Error al acceder al micrófono:', err);
+                    feedbackDiv.textContent = 'Error al acceder al micrófono. Asegúrate de que está permitido.';
+                    feedbackDiv.style.color = '#f56565';
+                });
+        }
+    </script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-start pt-8">
+    <h1 class="text-3xl font-semibold text-gray-800 mb-6">Afinador de Ukelele</h1>
+
+    <div class="fretboard" id="fretboard">
+        </div>
+
+    <div class="flex flex-wrap justify-center gap-4 mb-6">
+        <button id="tune-g" class="button-tune">
+            <img src="https://unpkg.com/lucide-static@latest/icons/music.svg" alt="Afinar G" class="button-icon">
+            Afinar G
+        </button>
+        <button id="tune-c" class="button-tune">
+            <img src="https://unpkg.com/lucide-static@latest/icons/music.svg" alt="Afinar C" class="button-icon">
+            Afinar C
+        </button>
+        <button id="tune-e" class="button-tune">
+            <img src="https://unpkg.com/lucide-static@latest/icons/music.svg" alt="Afinar E" class="button-icon">
+            Afinar E
+        </button>
+        <button id="tune-a" class="button-tune">
+            <img src="https://unpkg.com/lucide-static@latest/icons/music.svg" alt="Afinar A" class="button-icon">
+            Afinar A
+        </button>
+    </div>
+
+    <div class="feedback">
+        Toca una cuerda y selecciona el botón correspondiente para afinar.
+    </div>
+    <p class="text-gray-600 text-sm mt-4">Toca los botones para escuchar el tono de cada cuerda. Las notas en el diapasón se iluminarán.</p>
+
+    <div id="created-by">
+        Creado por Manuel Puebla
+    </div>
+</body>
+</html>
